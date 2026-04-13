@@ -1,0 +1,137 @@
+package search
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"github.com/huangke/bt-music/pkg/httputil"
+	"github.com/huangke/bt-music/pkg/utils"
+)
+
+type ApiBay struct {
+	baseURL string
+	client  *http.Client
+}
+
+func NewApiBay() *ApiBay {
+	return &ApiBay{
+		baseURL: "https://apibay.org",
+		client:  httputil.NewClient(httputil.DefaultTimeout),
+	}
+}
+
+func (a *ApiBay) Name() string { return "ThePirateBay" }
+
+type apiBayResult struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	InfoHash string `json:"info_hash"`
+	Leechers string `json:"leechers"`
+	Seeders  string `json:"seeders"`
+	Size     string `json:"size"`
+	Category string `json:"category"`
+}
+
+func (a *ApiBay) Search(keyword string, page int) ([]Result, error) {
+	apiURL := fmt.Sprintf("%s/q.php?q=%s&cat=", a.baseURL, url.QueryEscape(keyword))
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", httputil.DefaultUA)
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API 返回 %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		return nil, err
+	}
+	var apiResults []apiBayResult
+	if err := json.Unmarshal(body, &apiResults); err != nil {
+		return nil, err
+	}
+	var results []Result
+	for _, r := range apiResults {
+		if r.ID == "0" || r.Name == "No results returned" {
+			continue
+		}
+		seeders, _ := strconv.Atoi(r.Seeders)
+		leechers, _ := strconv.Atoi(r.Leechers)
+		sizeBytes, _ := strconv.ParseInt(r.Size, 10, 64)
+		result := Result{
+			Name:     r.Name,
+			Size:     utils.FormatBytes(sizeBytes),
+			Seeders:  seeders,
+			Leechers: leechers,
+			InfoHash: r.InfoHash,
+			Source:   a.Name(),
+		}
+		result.Magnet = BuildMagnet(r.InfoHash, url.QueryEscape(r.Name))
+		results = append(results, result)
+	}
+	return filterRelevant(results, keyword), nil
+}
+
+// filterRelevant 过滤不相关结果
+func filterRelevant(results []Result, keyword string) []Result {
+	tokens := keywordTokens(keyword)
+	if len(tokens) == 0 {
+		return results
+	}
+	var filtered []Result
+	for _, r := range results {
+		nameLower := strings.ToLower(r.Name)
+		for _, tok := range tokens {
+			if strings.Contains(nameLower, tok) {
+				filtered = append(filtered, r)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
+func keywordTokens(keyword string) []string {
+	keyword = strings.ToLower(strings.TrimSpace(keyword))
+	if keyword == "" {
+		return nil
+	}
+	var tokens []string
+	var cjk []rune
+	for _, r := range keyword {
+		if unicode.Is(unicode.Han, r) {
+			cjk = append(cjk, r)
+		} else {
+			if len(cjk) > 0 {
+				tokens = append(tokens, string(cjk))
+				cjk = nil
+			}
+		}
+	}
+	if len(cjk) > 0 {
+		tokens = append(tokens, string(cjk))
+	}
+	for _, word := range strings.Fields(keyword) {
+		cleaned := strings.Map(func(r rune) rune {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				return r
+			}
+			return -1
+		}, word)
+		if len(cleaned) >= 2 && !unicode.Is(unicode.Han, []rune(cleaned)[0]) {
+			tokens = append(tokens, cleaned)
+		}
+	}
+	return tokens
+}
