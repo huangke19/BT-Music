@@ -13,7 +13,8 @@
 - `download` 命令：按 B站 URL 或 BV 号下载 mp3
 - `get` 命令：按关键词搜索 B站并下载指定序号结果，适合 agent 一步式调用
 - `--json`：输出稳定 JSON，适合 Hermes agent 解析
-- 自动过滤不相关 BT 结果
+- `--video`：下载视频（mp4）而非音频（mp3），适用于 `get` 和 `download` 命令
+ - 自动过滤不相关 BT 结果
 - 支持中英文关键词
 - 代理支持（HTTP_PROXY / HTTPS_PROXY）
 
@@ -42,8 +43,11 @@ go build -o bt-music .
 ./bt-music --json --output-dir /tmp/music download BV1xx411c7mD "song title"
 
 # 一步式搜索并下载第 2 个 B站结果
-./bt-music --json --pick 2 --output-dir /tmp/music get "周杰伦 以父之名"
-```
+ ./bt-music --json --pick 2 --output-dir /tmp/music get "周杰伦 以父之名"
++
++# 下载视频（mp4）
++./bt-music --json --video download BV1JK4y1u7KH "Britney Spears - Baby One More Time"
+ ```
 
 当 stdin 不是终端时，不带命令会直接返回错误，避免 agent 误调用后等待交互输入。
 
@@ -115,6 +119,7 @@ HTTPS_PROXY=http://127.0.0.1:7890 ./bt-music
 | `--json` | 输出机器可读 JSON |
 | `--limit N` | 最多返回 N 条搜索结果，默认 10 |
 | `--pick N` | `get` 命令下载第 N 条结果，默认 1 |
+| `--video` | 下载视频（mp4）而非音频（mp3），适用于 `get` 和 `download` 命令 |
 | `--output-dir DIR` / `--dir DIR` | 下载目录，默认 `~/Downloads/BT-Music/` |
 
 ### 示例
@@ -151,7 +156,7 @@ magnet:?xt=urn:btih:...
 
 | 来源 | 擅长 | 接口 |
 |------|------|------|
-| B站 | 中文音乐、MV、Hi-Res | 搜索 API + curl 兜底，下载用 yt-dlp |
+| B站 | 中文音乐、MV、Hi-Res | 搜索 API + curl 兜底；音频（mp3）或视频（mp4）通过 yt-dlp 下载 |
 | ApiBay (TPB) | 英文专辑、FLAC | JSON API |
 | BTDigg | 综合 DHT | HTML 爬取 |
 | Nyaa | 日本音乐、动漫 OST | RSS |
@@ -167,7 +172,7 @@ magnet:?xt=urn:btih:...
 ├── main.go              # CLI 入口，交互式 REPL
 ├── search/
 │   ├── search.go        # Provider 接口、并发搜索、去重
-│   ├── bilibili.go      # B站 API 搜索 + yt-dlp 下载
+│   ├── bilibili.go      # B站 API 搜索 + yt-dlp 下载（音频/视频）
 │   ├── apibay.go        # ThePirateBay（JSON API）
 │   ├── btdig.go         # BTDigg（JSON API）
 │   └── nyaa.go          # Nyaa（RSS，动漫/日本音乐）

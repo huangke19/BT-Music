@@ -56,6 +56,22 @@ func TestParseArgsGetCommand(t *testing.T) {
 	}
 }
 
+func TestParseArgsVideoFlag(t *testing.T) {
+	cfg, command, args, err := parseArgs([]string{"--video", "download", "BV1test"})
+	if err != nil {
+		t.Fatalf("parseArgs returned error: %v", err)
+	}
+	if !cfg.video {
+		t.Fatalf("expected video=true, got %v", cfg.video)
+	}
+	if command != "download" {
+		t.Fatalf("command = %q, want download", command)
+	}
+	if len(args) != 1 || args[0] != "BV1test" {
+		t.Fatalf("args = %v", args)
+	}
+}
+
 func TestSanitizeFilename(t *testing.T) {
 	got := sanitizeFilename(`a/b\c:d*e?f"g<h>i|j`)
 	want := "a-b-c-d-efghi-j"

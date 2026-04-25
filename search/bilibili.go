@@ -133,20 +133,35 @@ type BilibiliResult struct {
 
 // BilibiliDownload 用 yt-dlp 从B站下载音频为 mp3
 func BilibiliDownload(bvURL, destDir, filename string) (string, error) {
-	return bilibiliDownload(bvURL, destDir, filename, os.Stdout, os.Stderr)
+	return bilibiliDownload(bvURL, destDir, filename, os.Stdout, os.Stderr, false)
 }
 
 // BilibiliDownloadQuiet 用 yt-dlp 下载音频，避免向 stdout 输出进度，便于 agent 解析 JSON。
 func BilibiliDownloadQuiet(bvURL, destDir, filename string) (string, error) {
 	var stderr bytes.Buffer
-	outFile, err := bilibiliDownload(bvURL, destDir, filename, io.Discard, &stderr)
+	outFile, err := bilibiliDownload(bvURL, destDir, filename, io.Discard, &stderr, false)
 	if err != nil && stderr.Len() > 0 {
 		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return outFile, err
 }
 
-func bilibiliDownload(bvURL, destDir, filename string, stdout, stderr io.Writer) (string, error) {
+// BilibiliDownloadVideo 下载视频为 mp4（最佳质量）
+func BilibiliDownloadVideo(bvURL, destDir, filename string) (string, error) {
+	return bilibiliDownload(bvURL, destDir, filename, os.Stdout, os.Stderr, true)
+}
+
+// BilibiliDownloadVideoQuiet 静默下载视频，适合 agent 调用
+func BilibiliDownloadVideoQuiet(bvURL, destDir, filename string) (string, error) {
+	var stderr bytes.Buffer
+	outFile, err := bilibiliDownload(bvURL, destDir, filename, io.Discard, &stderr, true)
+	if err != nil && stderr.Len() > 0 {
+		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return outFile, err
+}
+
+func bilibiliDownload(bvURL, destDir, filename string, stdout, stderr io.Writer, video bool) (string, error) {
 	if destDir == "" {
 		home, _ := os.UserHomeDir()
 		destDir = filepath.Join(home, "Downloads", "BT-Music")
@@ -161,12 +176,18 @@ func bilibiliDownload(bvURL, destDir, filename string, stdout, stderr io.Writer)
 	}
 
 	args := []string{
-		"--extract-audio",
-		"--audio-format", "mp3",
-		"--audio-quality", "0",
 		"-o", outTmpl,
 		"--no-playlist",
 		bvURL,
+	}
+	if video {
+		args = append(args, "--format", "bestvideo+bestaudio/best")
+	} else {
+		args = append(args,
+			"--extract-audio",
+			"--audio-format", "mp3",
+			"--audio-quality", "0",
+		)
 	}
 	cmd := exec.Command("yt-dlp", args...)
 	cmd.Env = os.Environ()

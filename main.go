@@ -20,6 +20,7 @@ type cliConfig struct {
 	jsonOutput bool
 	limit      int
 	pick       int
+	video      bool
 	destDir    string
 }
 
@@ -80,6 +81,7 @@ func parseArgs(args []string) (cliConfig, string, []string, error) {
 	fs.BoolVar(&cfg.jsonOutput, "json", false, "output machine-readable JSON")
 	fs.IntVar(&cfg.limit, "limit", 10, "maximum results to return")
 	fs.IntVar(&cfg.pick, "pick", 1, "result number to download for get command, 1-based")
+	fs.BoolVar(&cfg.video, "video", false, "download video (mp4) instead of audio (mp3)")
 	fs.StringVar(&cfg.destDir, "output-dir", cfg.destDir, "download directory")
 	fs.StringVar(&cfg.destDir, "dir", cfg.destDir, "download directory")
 	fs.Usage = printUsage
@@ -213,10 +215,18 @@ func downloadBilibili(cfg cliConfig, command, url, title string) error {
 	filename := sanitizeFilename(title)
 	var outFile string
 	var err error
-	if cfg.jsonOutput {
-		outFile, err = search.BilibiliDownloadQuiet(url, cfg.destDir, filename)
+	if cfg.video {
+		if cfg.jsonOutput {
+			outFile, err = search.BilibiliDownloadVideoQuiet(url, cfg.destDir, filename)
+		} else {
+			outFile, err = search.BilibiliDownloadVideo(url, cfg.destDir, filename)
+		}
 	} else {
-		outFile, err = search.BilibiliDownload(url, cfg.destDir, filename)
+		if cfg.jsonOutput {
+			outFile, err = search.BilibiliDownloadQuiet(url, cfg.destDir, filename)
+		} else {
+			outFile, err = search.BilibiliDownload(url, cfg.destDir, filename)
+		}
 	}
 	if err != nil {
 		return err
