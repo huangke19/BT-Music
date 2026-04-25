@@ -8,13 +8,13 @@ import (
 
 // Result BT 搜索结果
 type Result struct {
-	Name     string
-	Size     string
-	Seeders  int
-	Leechers int
-	Magnet   string
-	Source   string
-	InfoHash string
+	Name     string `json:"name"`
+	Size     string `json:"size"`
+	Seeders  int    `json:"seeders"`
+	Leechers int    `json:"leechers"`
+	Magnet   string `json:"magnet"`
+	Source   string `json:"source"`
+	InfoHash string `json:"info_hash"`
 }
 
 // Provider BT 搜索源接口
@@ -47,15 +47,17 @@ func Search(keyword string, providers []Provider) ([]Result, error) {
 	}
 	var all []Result
 	var lastErr error
+	successCount := 0
 	for range providers {
 		r := <-ch
 		if r.err != nil {
 			lastErr = r.err
 			continue
 		}
+		successCount++
 		all = append(all, r.results...)
 	}
-	if len(all) == 0 && lastErr != nil {
+	if len(all) == 0 && successCount == 0 && lastErr != nil {
 		return nil, fmt.Errorf("所有搜索源失败: %w", lastErr)
 	}
 
